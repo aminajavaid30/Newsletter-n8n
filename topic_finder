@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        256
+      ],
+      "id": "28845d0c-c4b4-4ea5-8fe3-5e43e2be8775",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QYpL1COBP9aE6Lbh",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"topics\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"description\": \"Top trending AI news topics\"\n      }\n    },\n  \"required\": [\"topics\"]\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -80,
+        256
+      ],
+      "id": "e0b4beec-4295-4b3c-860a-c079531d219f",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze all the RSS feed titles below to suggest top 5 trending AI topics.\n\nRSS Feed Titles:\n{{ JSON.stringify($input.all()) }}\n\nFind the 5 most trending AI topics based on their mentions in titles. ",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an expert AI research assistant.\nYour job is to find trending AI news topics from ALL the provided RSS feed titles.\n\nIMPORTANT INSTRUCTIONS:\n- Analyze ALL the RSS feed titles provided in the input\n- Find 5 trending AI topics based on maximum mentions across ALL titles\n- Each topic should be 10 words or less\n- Base topics only on the provided data, not your own knowledge\n\nReturn JSON with:\n- \"topics\": array of 5 trending AI topic strings"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -16
+      ],
+      "id": "4deef7bd-4b7f-4eb5-9ad9-f54e9a748f76",
+      "name": "Topic Finder Agent",
+      "executeOnce": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -976,
+        -16
+      ],
+      "id": "0ef96b7b-0ebb-43d8-9af8-7b75aa95a6f2",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aminaj-newsletter-api.hf.space/extract_titles",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "=application/json",
+        "body": "[\"https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml\", \"https://www.technologyreview.com/feed/\", \"https://thegradient.pub/rss/\"] ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -672,
+        -16
+      ],
+      "id": "d8a630ba-64b9-4a91-8155-d70282590138",
+      "name": "Extract Titles from RSS Feeds",
+      "executeOnce": true,
+      "retryOnFail": true
+    }
+  ],
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Extract Titles from RSS Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Titles from RSS Feeds": {
+      "main": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "22abdc87d0dbff502cc5df5645a6633aaf13de13e1f3a2210cb18ccb3e0d81c7"
+  }
+}
