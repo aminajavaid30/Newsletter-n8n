@@ -1,0 +1,84 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        -112
+      ],
+      "id": "36df553c-c5a6-4826-98de-a52337f43e6b",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a newsletter using the following news: \n{{ JSON.stringify($input.all()) }}",
+        "options": {
+          "systemMessage": "You are an expert AI newsletter writer.\nYour job is to write a newsletter based on given AI news articles for topics.\nYour style or tone should be informative, concise, and engaging.\nYour task is to write a newsletter based on given AI news articles for topics.\nCreate an engaging title of the newsletter and don't include month or date in the title.\nSummarize each article in a maximum of 100 words using the summary and content provided.\nWrite a newsletter in structured markdown format with a maximum of 1000 words.\nInclude links to each article in the newsletter using the link provided.\n\nReturn only the newsletter as your response.\nDo not include any extra commentary or formatting in the newsletter.\nFormat the newsletter in a structured markdown format taking care of spacing, indentation, and line breaks.\nInclude appropriate emojis in the newsletter in front of each title.\nDo not add any extra characters inside or around the newsletter."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -112
+      ],
+      "id": "fb8652f6-f296-4ffa-b9ac-c9d424e8a5fc",
+      "name": "AI Agent",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        592,
+        112
+      ],
+      "id": "ded30f74-5fec-4c9b-a17e-963a1d397220",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QYpL1COBP9aE6Lbh",
+          "name": "Groq account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "22abdc87d0dbff502cc5df5645a6633aaf13de13e1f3a2210cb18ccb3e0d81c7"
+  }
+}
