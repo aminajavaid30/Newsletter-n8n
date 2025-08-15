@@ -1,0 +1,221 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -784,
+        32
+      ],
+      "id": "8ccbbbe6-f4b1-4886-8974-618fbcf2cdb5",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        256
+      ],
+      "id": "f53d3236-24a7-441d-b27d-e00df2efde97",
+      "name": "Groq Chat Model Discovery",
+      "credentials": {
+        "groqApi": {
+          "id": "QYpL1COBP9aE6Lbh",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"feeds\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"url\": { \"type\": \"string\" },\n          \"title\": { \"type\": \"string\", \"description\": \"Brief name of the feed source\" },\n          \"description\": { \"type\": \"string\", \"description\": \"Short explanation of why it's relevant\" }\n        },\n        \"required\": [\"url\"]\n      }\n    }\n  },\n  \"required\": [\"feeds\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        256
+      ],
+      "id": "bf036025-585c-4d20-b137-1512c380c194",
+      "name": "Structured Output Parser Discovery"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Suggest top RSS feeds for the topic: {{ $json.query.topic }}. Focus on feeds that cover recent news and articles in this domain.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert RSS feed curator with extensive knowledge of web sources across all domains.\n\nYour task is to generate a list of REAL, ACTIVE RSS feed URLs for the given topic.\n\nRULES:\n1. Only provide feeds that actually exist and are currently active\n2. Prioritize authoritative sources in the domain\n3. Include a mix of:\n   - Major news outlets\n   - Specialized publications\n   - Research/academic sources (if relevant)\n   - Industry leaders/organizations\n4. For each feed, specify:\n   - The exact RSS feed URL (not the website homepage)\n   - The source name\n   - Reliability rating (high/medium/low)\n   - Primary content focus\n5. Also provide 3-4 fallback feeds as alternatives\n\nIMPORTANT: Ensure URLs follow common RSS patterns:\n- End with /rss, /feed, .xml, /rss.xml, /feed.xml\n- Use HTTPS when available\n- For major sites, use their known feed URLs:\n  * TechCrunch: https://techcrunch.com/feed/\n  * Cointelegraph: https://cointelegraph.com/rss\n  * Wired: https://www.wired.com/feed/rss\n  * Reuters: https://www.reuters.com/rssFeed/[section]\n\nFocus on quality over quantity. All URLs must be valid RSS/Atom feed endpoints."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        32
+      ],
+      "id": "341721cc-8f9f-4fa1-86dc-f4433127b8f7",
+      "name": "Feed Discovery Agent",
+      "executeOnce": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.feeds",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        32
+      ],
+      "id": "4df71f2b-ce1d-465a-9e35-12016a5d307a",
+      "name": "Split Feeds",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "901d6b3d-dcb9-486f-88d6-db96be55d893",
+      "name": "Filter Valid Feeds",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [
+        304,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// RSS Feed Validator Function - Dynamic Input Version\n// This function validates RSS feeds from input items using lightweight HEAD requests\n\n// Get all input items (feeds) from previous node\nconst feeds = $input.all();\n\n// Function to validate a single feed\nasync function validateFeed(feedItem) {\n // Extract the feed data from the input item\n const feed = feedItem.json;\n \n // Ensure we have a URL to validate\n if (!feed.url) {\n   return {\n     ...feed,\n     isValid: false,\n     status: 'failed',\n     statusCode: 0,\n     contentType: 'unknown',\n     reason: 'No URL provided',\n     timestamp: new Date().toISOString()\n   };\n }\n \n try {\n   // Make HEAD request to check feed availability\n   const response = await this.helpers.httpRequest({\n     method: 'HEAD',\n     url: feed.url,\n     timeout: 5000,\n     headers: {\n       'User-Agent': 'Mozilla/5.0 (compatible; FeedValidator/1.0; +bot)',\n       'Accept': 'application/rss+xml, application/xml, text/xml, */*',\n       'Cache-Control': 'no-cache'\n     },\n     returnFullResponse: true,\n     ignoreHttpStatusErrors: true\n   });\n   \n   // Determine if feed is valid based on status code\n   const statusCode = response.statusCode;\n   const isValid = statusCode >= 200 && statusCode < 300;\n   \n   // Get content type\n   const contentType = response.headers['content-type'] || response.headers['Content-Type'] || 'unknown';\n   \n   return {\n     ...feed,\n     isValid: isValid,\n     status: isValid ? 'success' : 'failed',\n     statusCode: statusCode,\n     contentType: contentType,\n     reason: !isValid ? getErrorReason(statusCode) : 'Feed is accessible',\n     timestamp: new Date().toISOString()\n   };\n   \n } catch (error) {\n   // Handle connection errors\n   return {\n     ...feed,\n     isValid: false,\n     status: 'failed',\n     statusCode: 0,\n     contentType: 'unknown',\n     reason: `Connection error: ${error.message}`,\n     timestamp: new Date().toISOString()\n   };\n }\n}\n\n// Helper function to get error reason\nfunction getErrorReason(statusCode) {\n if (statusCode === 404) return 'Feed not found';\n if (statusCode === 403) return 'Access forbidden';\n if (statusCode === 429) return 'Rate limited';\n if (statusCode === 401) return 'Unauthorized';\n if (statusCode >= 500) return `Server error (${statusCode})`;\n if (statusCode >= 400) return `Client error (${statusCode})`;\n if (statusCode === 0) return 'Connection failed';\n return `Unexpected status (${statusCode})`;\n}\n\n// Validate all input feeds\nconst results = [];\nfor (const feedItem of feeds) {\n const result = await validateFeed.call(this, feedItem);\n results.push(result);\n \n // Small delay to avoid rate limiting (only if multiple feeds)\n if (feeds.length > 1) {\n   await new Promise(resolve => setTimeout(resolve, 200));\n }\n}\n\n// Return results - each feed as a separate item for easy filtering\nreturn results.map(result => ({ json: result }));\n\n// You can now use an IF node or Filter node after this to separate:\n// - Valid feeds: {{ $json.isValid === true }}\n// - Invalid feeds: {{ $json.isValid === false }}"
+      },
+      "id": "21b023ad-e8b3-4e59-ade1-8aa4a8c7ba8c",
+      "name": "RSS Feed Validator",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        96,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract URLs and return as a simple array\nconst allItems = $input.all().slice(0, 2);\n\n// Extract just the URLs from valid feeds\nconst urls = allItems\n  .map(item => item.json.url)\n  .filter(url => url);\n\n// Return as JSON object with \"urls\" key\nreturn [\n  {\n    json: {\n      urls: urls\n    }\n  }\n];"
+      },
+      "id": "f7d82ac8-31cc-43a7-8dcd-e4f94557ca2c",
+      "name": "Extract URLs Only",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        496,
+        32
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Feed Discovery Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model Discovery": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Feed Discovery Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser Discovery": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Feed Discovery Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feed Discovery Agent": {
+      "main": [
+        [
+          {
+            "node": "Split Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Feeds": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Feeds": {
+      "main": [
+        [
+          {
+            "node": "Extract URLs Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Validator": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract URLs Only": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "22abdc87d0dbff502cc5df5645a6633aaf13de13e1f3a2210cb18ccb3e0d81c7"
+  }
+}
