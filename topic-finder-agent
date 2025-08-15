@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"topics\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"description\": \"Top trending news topics\"\n      }\n    },\n  \"required\": [\"topics\"]\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        144
+      ],
+      "id": "78c7a5e3-6d2d-42d7-a95b-eec318da80ee",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze all the RSS feed titles below to suggest top 5 trending news topics.\n\nRSS Feed Titles:\n{{ JSON.stringify($input.all()) }}\n\nFind the 5 most trending news topics based on their mentions in titles. ",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an expert news research assistant.\nYour job is to find trending news topics from ALL the provided RSS feed titles.\n\nIMPORTANT INSTRUCTIONS:\n- Analyze ALL the RSS feed titles provided in the input\n- Find 5 trending news topics based on maximum mentions across ALL titles\n- Each topic should be 10 words or less\n- Base topics only on the provided data, not your own knowledge\n\nReturn JSON with:\n- \"topics\": array of 5 trending news topic strings"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -96
+      ],
+      "id": "311ab7d9-9399-4e67-b9e7-0d64d3779d51",
+      "name": "Topic Finder Agent",
+      "executeOnce": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        -96
+      ],
+      "id": "2cfd1148-20bc-4b72-be53-3acccd9a4086",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aminaj-newsletter-api.hf.space/extract_titles",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.urls }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -704,
+        -96
+      ],
+      "id": "df499e95-2999-46b7-88ab-987a2b581174",
+      "name": "Extract Titles from RSS Feeds",
+      "executeOnce": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        144
+      ],
+      "id": "a2a00cdc-2943-4ed7-94be-b50f42719076",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QYpL1COBP9aE6Lbh",
+          "name": "Groq account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Extract Titles from RSS Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Titles from RSS Feeds": {
+      "main": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Topic Finder Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "22abdc87d0dbff502cc5df5645a6633aaf13de13e1f3a2210cb18ccb3e0d81c7"
+  }
+}
