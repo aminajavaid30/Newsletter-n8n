@@ -1,0 +1,118 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -384,
+        48
+      ],
+      "id": "96b0728b-e182-4af8-a865-b28d027375e2",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Summarize and organize the news articles related to each topic to make them interesting for the reader.",
+        "options": {
+          "systemMessage": "=You are an expert content organization and summarization agent.\n\nYou will receive:\n- news: An array of news related to various topics\nEach news item contains:\n  - topic: News topic\n  - news articles: A list of news related to the topic\n\nYour task is to organize and summarize the topics and news content to be passed to the newsletter generator agent.\n\nUse the following news to generate response: {{ JSON.stringify($json) }}\n\nOrganize the news in the following way:\n\nExample:\n## Topic 1\n### News Article 1\n- Title\n- Link\n- Summary\n- Content\n### News Article 2\n- Title\n- Link\n- Summary\n- Content\n...\n\n## Topic 2\n### News Article 1\n- Title\n- Link\n- Summary\n- Content\n### News Article 2\n- Title\n- Link\n- Summary\n- Content\n... and so on.\n\nSummarize the news artices so that the reader finds them engaging and intersting.\n\nReturn all topics and their news articles as a response.\nMake sure that the news are not repeated.\nDo NOT make up your own news."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        48,
+        48
+      ],
+      "id": "f5e45f3e-f36b-4e81-aec5-9fc9847ad81e",
+      "name": "News Search Agent"
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        16,
+        304
+      ],
+      "id": "b0e58186-5047-4393-b121-a74540f74145",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QYpL1COBP9aE6Lbh",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aminaj-newsletter-api.hf.space/extract_news",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({   feed_urls: Array.isArray($json.urls) ? $json.urls : [],   topics: Array.isArray($json.output.topics) ? $json.output.topics : [],   threshold: 0.7 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -176,
+        48
+      ],
+      "id": "8984cc11-a04e-4ee3-a9f7-477e039a15dc",
+      "name": "HTTP Request"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News Search Agent": {
+      "main": [
+        []
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "News Search Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "News Search Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "22abdc87d0dbff502cc5df5645a6633aaf13de13e1f3a2210cb18ccb3e0d81c7"
+  }
+}
